@@ -1,4 +1,5 @@
 import numpy as np
+from solvers.explicit import Solver
 
 class SystemInterface:
     """
@@ -12,13 +13,7 @@ class SystemInterface:
         """
         raise NotImplementedError("This method is not implemented for this System.")
 
-    def get_state_description(self):
-        """
-        Get list of strings with the expected structure of the state space vector
-        """
-        return NotImplementedError("This method is not implemented for this System.")
-
-    def step(self, t, w, f=lambda t,w: 0, **params):
+    def __call__(self, t, w, f=lambda t,w: 0, **params):
         """
         Provide the change in every state variable as the result of the current
         time, state space and inputs applied to the system.
@@ -33,6 +28,34 @@ class SystemInterface:
         """
         raise NotImplementedError("This method is not implemented for this System.")
     
+    def get_state_description(self):
+        """
+        Get list of strings with the expected structure of the state space vector
+        """
+        return NotImplementedError("This method is not implemented for this System.")
+    
+    def solve(self, solver:Solver, w_0:np.array, t_span, n_steps=1000, controller=None, f_ext = lambda t,w:0):
+        """
+        Develop a Forward Euler Simulation of the System for a specific initial condition, timespan,
+        number of steps, controller, and external force function.
+        """
+        ## Initialize Solution Array
+        t_sol = np.linspace(*t_span, n_steps)
+        w_sol_T = np.ndarray((t_sol.size,w_0.size))
+        w_sol_T[0] = w_0
+
+        ## Solve
+        for i in range(t_sol.size-1):
+            if controller: controller.dt = t_sol[1]-t_sol[0]
+            contr_input = 0 if not controller else controller(t_sol[i],w_sol_T[i]) # Controller action as input TODO: Change to action vector
+            u = lambda t,w: f_ext(t,w)+contr_input # Function must probably be a input vector function
+            df = lambda t,w: self(t,w,u)
+            dt = t_sol[i+1]-t_sol[i]
+            dw = solver.step(df,t_sol[i],w_sol_T[i],dt)
+            w_sol_T[i+1] = w_sol_T[i] + dw*dt
+        w_sol = w_sol_T.T
+        return t_sol, w_sol
+
     def solve_fe(self, w_0:np.array, t_span, n_steps=1000, controller=None, f_ext = lambda t,w:0):
         """
         Develop a Forward Euler Simulation of the System for a specific initial condition, timespan,
@@ -46,9 +69,9 @@ class SystemInterface:
         ## Solve
         for i in range(t_sol.size-1):
             if controller: controller.dt = t_sol[1]-t_sol[0]
-            f_cont = (lambda t,w: 0) if not controller else controller
-            f_tot = lambda t,w: f_ext(t,w)+f_cont(t,w)
-            dw = self.step(t_sol[i],w_sol_T[i],f_tot)
+            contr_input = (lambda t,w: 0) if not controller else controller(t_sol[i],w_sol_T[i])
+            f_tot = lambda t,w: f_ext(t,w)+contr_input
+            dw = self(t_sol[i],w_sol_T[i],f_tot)
             dt = t_sol[i+1]-t_sol[i]
             w_sol_T[i+1] = w_sol_T[i] + dw*dt
         w_sol = w_sol_T.T
