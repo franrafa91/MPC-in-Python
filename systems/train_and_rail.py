@@ -30,7 +30,7 @@ class Train_and_Rail(SystemInterface):
 
         self.dw_sol = []
 
-    def step(self, t, w, f= lambda t,w: 0):
+    def __call__(self, t, w, f= lambda t,w: 0):
         """
         Solution at a given time and state vector for the spring-damper system.
 

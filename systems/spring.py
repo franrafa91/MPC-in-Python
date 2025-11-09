@@ -27,7 +27,7 @@ class Spring(SystemInterface):
 
         self.dw_sol = []
 
-    def step(self, t, w, f= lambda t,w: 0):
+    def __call__(self, t, w, f = lambda t,w: 0):
         """
         Solution at a given time and state vector for the spring-damper system.
 
@@ -42,7 +42,7 @@ class Spring(SystemInterface):
 
         # unpack state vector
         assert(np.array(w).size == 2)
-        x, v, = w
+        x, v = w
 
         # compute derivatives
         dv = (-self.k*x - self.c*v + f(t,w))/self.m # Acceleration
